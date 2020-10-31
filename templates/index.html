@@ -1,0 +1,39 @@
+{{define "base"}}
+<!doctype html>
+<html>
+  <head>
+{{template "headtag" .}}
+  </head>
+  <body>
+    <h1 class="ui center aligned header">Amazon Elasticsearch Service</h1>
+    <div class="main ui container">
+      <form class="ui segment" method="POST">
+        <div class="content">
+          <div class="ui form">
+            <div class="field">
+              <label>Search Word</label>
+              <div class="ui input">
+                <input id="search_word" name="search_word" type="text">
+              </div>
+            </div>
+            <div class="field">
+              <div id="submit" class="ui green button" onclick="Search();">Search</div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div id="warning" class="ui hidden warning message"></div>
+    <div id="info" class="ui hidden info message">
+      <i class="close icon"></i>
+      <div class="header">
+        <b>Result</b>
+      </div>
+      <div class="ui segment">
+        <div id="result" class="ui link list">
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+{{end}}

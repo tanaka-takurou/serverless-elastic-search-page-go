@@ -1,0 +1,146 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Elastic Search Service Page
+
+Parameters:
+  ApplicationName:
+    Type: String
+    Default: 'ServerlessElasticSearchServicePage'
+  FrontPageApiStageName:
+    Type: String
+    Default: 'ProdStage'
+  DataTableName:
+    Type: String
+    Default: 'search_target'
+  ESDomainName:
+    Type: String
+    Default: 'es-sample'
+    AllowedPattern: "[a-z][a-z0-9\\-]+"
+  ESIndexName:
+    Type: String
+    Default: 'messages'
+  ESTypeName:
+    Type: String
+    Default: 'message'
+
+Resources:
+  FrontPageApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: ServerlessElasticSearchServicePageApi
+      EndpointConfiguration: REGIONAL
+      StageName: !Ref FrontPageApiStageName
+  FrontPageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ServerlessElasticSearchServicePageFrontFunction
+      CodeUri: bin/
+      Handler: main
+      MemorySize: 256
+      Runtime: go1.x
+      Description: 'Test Front Function'
+      Policies:
+      Environment:
+        Variables:
+          REGION: !Ref 'AWS::Region'
+          API_PATH: !Join [ '', [ '/', !Ref FrontPageApiStageName, '/api'] ]
+      Events:
+        FrontPageApi:
+          Type: Api
+          Properties:
+            Path: '/'
+            Method: get
+            RestApiId: !Ref FrontPageApi
+  ElasticSearchServiceLoadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ElasticSearchServiceLoadFunction
+      CodeUri: api/load/bin/
+      Handler: main
+      MemorySize: 256
+      Runtime: go1.x
+      Description: 'ElasticSearchService Service Load Function'
+      Policies:
+      Environment:
+        Variables:
+          REGION: !Ref 'AWS::Region'
+          DOMAIN: !GetAtt ElasticSearchServiceDomain.DomainEndpoint
+          ES_INDEX_NAME: !Ref ESIndexName
+          ES_TYPE_NAME: !Ref ESTypeName
+      Events:
+        FrontPageApi:
+          Type: Api
+          Properties:
+            Path: '/api'
+            Method: post
+            RestApiId: !Ref FrontPageApi
+  ElasticSearchServiceSaveFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ElasticSearchServiceSaveFunction
+      CodeUri: api/save/bin/
+      Handler: main
+      MemorySize: 256
+      Runtime: go1.x
+      Description: 'ElasticSearchService Service Save Function'
+      Policies:
+      Environment:
+        Variables:
+          REGION: !Ref 'AWS::Region'
+          DOMAIN: !GetAtt ElasticSearchServiceDomain.DomainEndpoint
+          ES_INDEX_NAME: !Ref ESIndexName
+          ES_TYPE_NAME: !Ref ESTypeName
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt DataTable.StreamArn
+            BatchSize: 100
+            StartingPosition: LATEST
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "id"
+        AttributeType: "N"
+      KeySchema:
+      - AttributeName: "id"
+        KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      SSESpecification:
+        SSEEnabled: True
+      TableName: !Ref DataTableName
+      StreamSpecification:
+        StreamViewType: "NEW_IMAGE"
+  ElasticsearchDomain:
+    Type: AWS::Elasticsearch::Domain
+    Properties:
+      DomainName: !Ref ESDomainName
+      ElasticsearchClusterConfig:
+        DedicatedMasterEnabled: "false"
+        InstanceCount: "1"
+        ZoneAwarenessEnabled: "false"
+        InstanceType: "t2.micro.elasticsearch"
+      EBSOptions:
+        EBSEnabled: true
+        VolumeSize: 10
+        VolumeType: "gp2"
+      SnapshotOptions:
+        AutomatedSnapshotStartHour: "0"
+      AccessPolicies:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action: "es:ESHttp*"
+            Resource: "*"
+      AdvancedOptions:
+        rest.action.multi.allow_explicit_index: "true"
+
+Outputs:
+  APIURI:
+    Description: "URI"
+    Value: !Join [ '', [ 'https://', !Ref FrontPageApi, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com/',!Ref FrontPageApiStageName,'/'] ]
