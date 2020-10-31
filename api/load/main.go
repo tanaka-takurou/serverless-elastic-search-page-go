@@ -55,17 +55,23 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 func search(word string)([]string, error) {
 	var res []string
 	rawResponse, err := getRawResponse(os.Getenv("DOMAIN") + "/" + os.Getenv("ES_INDEX_NAME") + "/" + os.Getenv("ES_TYPE_NAME") + "/_search?q=" + word)
-	if err != nil {
+	if err != nil || rawResponse == nil {
 		return res, err
 	}
-	rawResponse_ := rawResponse.(map[string]interface{})["hits"].(map[string]interface{})["hits"].([]interface{})
-	if len(rawResponse_) < 1 {
+	rawResponse_ := rawResponse.(map[string]interface{})["hits"]
+	if rawResponse_ == nil {
 		return res, fmt.Errorf("Error: %s", "No hits")
 	}
-	for _, v := range rawResponse_ {
-		hitText := v.(map[string]interface{})["_source"].(map[string]interface{})["text"].(string)
-		if len(hitText) > 0 {
-			res = append(res, hitText)
+	rawResponse__ := rawResponse_.(map[string]interface{})["hits"].([]interface{})
+	if len(rawResponse__) < 1 {
+		return res, fmt.Errorf("Error: %s", "No hits")
+	}
+	for _, v := range rawResponse__ {
+		hitText := v.(map[string]interface{})["_source"].(map[string]interface{})
+		for _, v_ := range hitText {
+			if len(v_.(string)) > 0 {
+				res = append(res, v_.(string))
+			}
 		}
 	}
 	return res, nil
